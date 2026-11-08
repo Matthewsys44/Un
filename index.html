@@ -1,0 +1,118 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>3D Neon Kaleidoscope Pad</title><style>
+body{margin:0;padding:0;background:#000;color:#fff;font-family:sans-serif;overflow:hidden;height:100vh;user-select:none;-webkit-user-select:none;}
+hdr{text-align:center;padding:8px 0;background:rgba(10,10,10,0.95);border-bottom:1px solid #111;position:absolute;top:0;left:0;right:0;height:30px;z-index:15;}
+.w-txt{color:#FFD700;font-size:18px;font-weight:bold;text-shadow:0 0 10px #FFD700;margin:0;}
+.toolbar{background:rgba(15,15,15,0.98);border-bottom:1px solid #222;padding:10px;box-sizing:border-box;position:absolute;top:46px;left:0;right:0;height:90px;z-index:15;display:flex;flex-direction:column;gap:8px;}
+.row{display:flex;justify-content:space-around;align-items:center;gap:10px;}
+.control-group{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:bold;color:#ccc;}
+input[type="range"]{width:80px;accent-color:#FFD700;}
+.btn{background:#222;color:#fff;border:1px solid #444;padding:6px 12px;font-weight:bold;font-size:13px;border-radius:6px;cursor:pointer;}
+.clear-btn{background:#500;border-color:#800;}
+.spin-btn{background:#2b6cb0;border-color:#3182ce;}
+.palette{display:flex;gap:10px;overflow-x:auto;padding:2px;justify-content:center;width:100%;}
+.dot{width:28px;height:28px;border-radius:50%;cursor:pointer;border:2px solid transparent;box-sizing:border-box;transition:transform 0.1s;}
+.dot.active{border-color:#fff;transform:scale(1.25);}
+#canvas-container{position:absolute;top:136px;bottom:0;left:0;right:0;background:#000;z-index:5;}
+canvas{display:block;width:100%;height:100%;touch-action:none;}
+</style></head><body>
+<hdr><div class="w-txt">3D Neon Kaleidoscope Portal Pad</div></hdr>
+<div class="toolbar">
+    <div class="row">
+        <div class="control-group"><label>Slices:</label><input type="range" id="slices" min="4" max="36" value="12" step="2"></div>
+        <div class="control-group"><label>Size:</label><input type="range" id="size" min="2" max="25" value="6"></div>
+        <div class="control-group"><label>⚡ Speed:</label><input type="range" id="speed" min="1" max="10" value="3" onchange="document.getElementById('spdVal').innerText=this.value"><span id="spdVal" style="color:#FFD700;width:16px;">3</span></div>
+        <button class="btn spin-btn" id="spinToggle" onclick="toggleSpin()">🔄 Spin: OFF</button>
+        <button class="btn clear-btn" onclick="clearCanvas()">🗑️ Clear</button>
+    </div>
+    <div class="row"><div class="palette" id="palette"></div></div>
+</div>
+<div id="canvas-container"><canvas id="paintCanvas"></canvas></div>
+<script>
+const canvas=document.getElementById('paintCanvas'),ctx=canvas.getContext('2d'),container=document.getElementById('canvas-container');
+let isDrawing=false,lastX=0,lastY=0,curColor='#00FFFF',isSpinning=false,spinAngle=0;
+const neonColors=['#00FFFF','#FF00FF','#00FF00','#FFD700','#FF3333','#33FFF6','#9D33FF','#FF55BB','#FFFFFF'];
+
+function resizeCanvas(){
+    if (!container) return;
+    canvas.width=container.clientWidth; canvas.height=container.clientHeight;
+    clearCanvas();
+}
+function setupPalette(){
+    const p=document.getElementById('palette');
+    if (!p || p.children.length > 0) return;
+    neonColors.forEach((c,i)=>{
+        const d=document.createElement('div');d.className='dot';d.style.backgroundColor=c;d.style.boxShadow=`0 0 12px ${c}`;
+        if(i===0)d.classList.add('active');
+        d.addEventListener('click',()=>{document.querySelectorAll('.dot').forEach(el=>el.classList.remove('active'));d.classList.add('active');curColor=c;});
+        p.appendChild(d);
+    });
+}
+function clearCanvas(){
+    if (!ctx) return;
+    ctx.fillStyle='#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.lineCap='round'; ctx.lineJoin='round';
+}
+function drawSymmetry(x1,y1,x2,y2){
+    if (!ctx) return;
+    const cx=canvas.width/2,cy=canvas.height/2,slices=parseInt(document.getElementById('slices').value),bSize=parseInt(document.getElementById('size').value),step=(Math.PI*2)/slices;
+    let sx=x1-cx,sy=y1-cy,ex=x2-cx,ey=y2-cy;
+    
+    ctx.save();ctx.translate(cx,cy);
+    if(isSpinning){ctx.rotate(spinAngle);}
+    ctx.lineWidth=bSize;ctx.strokeStyle=curColor;ctx.shadowBlur=bSize*2.2;ctx.shadowColor=curColor;
+    
+    for(let i=0;i<slices;i++){
+        ctx.rotate(step);
+        ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,ey);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(sx,-sy);ctx.lineTo(ex,-ey);ctx.stroke();
+    }
+    ctx.restore();
+}
+function toggleSpin(){isSpinning=!isSpinning;document.getElementById('spinToggle').innerText=isSpinning?"🔄 Spin: ON":"🔄 Spin: OFF";}
+function getPos(e){
+    const rect=canvas.getBoundingClientRect();
+    let clientX=0, clientY=0;
+    if(e.touches && e.touches.length>0){
+        clientX=e.touches[0].clientX; 
+        clientY=e.touches[0].clientY;
+    } else if(e.changedTouches && e.changedTouches.length>0){
+        clientX=e.changedTouches[0].clientX; 
+        clientY=e.changedTouches[0].clientY;
+    } else {
+        clientX=e.clientX; 
+        clientY=e.clientY;
+    }
+    return{x:clientX - rect.left, y:clientY - rect.top};
+}
+function start(e){isDrawing=true;const p=getPos(e);lastX=p.x;lastY=p.y;}
+function move(e){if(!isDrawing)return;e.preventDefault();const p=getPos(e);drawSymmetry(lastX,lastY,p.x,p.y);lastX=p.x;lastY=p.y;}
+function stop(){isDrawing=false;}
+
+function renderLoop(){
+    requestAnimationFrame(renderLoop);
+    if(isSpinning && ctx){
+        const speedMultiplier=parseInt(document.getElementById('speed').value);
+        spinAngle+=(speedMultiplier * 0.003);
+        
+        // This math rotates the internal 2D drawing matrix directly to fake the 3D spiral spin
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(canvas, 0, 0);
+        
+        ctx.fillStyle='#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.save(); ctx.translate(canvas.width/2, canvas.height/2);
+        ctx.rotate(speedMultiplier * 0.003);
+        ctx.drawImage(tempCanvas, -canvas.width/2, -canvas.height/2);
+        ctx.restore();
+    }
+}
+
+canvas.addEventListener('mousedown',start);canvas.addEventListener('mousemove',move);window.addEventListener('mouseup',stop);
+canvas.addEventListener('touchstart',start,{passive:false});canvas.addEventListener('touchmove',move,{passive:false});window.addEventListener('touchend',stop);
+window.addEventListener('resize',resizeCanvas);
+
+window.addEventListener('DOMContentLoaded', () => { setTimeout(resizeCanvas, 100); setupPalette(); renderLoop(); });
+if (document.readyState === "complete" || document.readyState === "interactive") { setTimeout(resizeCanvas, 100); setupPalette(); renderLoop(); }
+</script></body></html>
